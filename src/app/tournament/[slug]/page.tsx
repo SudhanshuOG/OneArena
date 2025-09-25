@@ -74,13 +74,16 @@ export default async function TournamentPage({ params }: Props) {
         <h2 className="text-lg font-medium mb-2">Actions</h2>
         <ul className="list-disc pl-6 text-sm text-zinc-300">
           <li>
-            <Link href={`/tournament/${tournament.slug}/weeks`}>
-              <a className="underline">View weeks & matches (placeholder)</a>
+            <Link
+              href={`/tournament/${tournament.slug}/weeks`}
+              className="underline"
+            >
+              View weeks & matches (placeholder)
             </Link>
           </li>
           <li>
-            <Link href="/">
-              <a className="underline">Back to tournaments</a>
+            <Link href="/" className="underline">
+              Back to tournaments
             </Link>
           </li>
         </ul>

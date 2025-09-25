@@ -22,8 +22,8 @@ export default function TournamentCard({
   return (
     <article className="border rounded-2xl p-4 shadow-sm hover:shadow-md transition">
       <h2 className="text-lg font-semibold">
-        <Link href={`/tournament/${slug}`}>
-          <a className="hover:underline">{title}</a>
+        <Link href={`/tournament/${slug}`} className="hover:underline">
+          {title}
         </Link>
       </h2>
 

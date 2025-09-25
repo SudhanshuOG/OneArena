@@ -34,8 +34,8 @@ export default async function WeekDetail({ params }: Props) {
       <main className="p-6">
         <h1 className="text-2xl font-bold">Week not found</h1>
         <p>
-          <Link href={`/tournament/${slug}/weeks`}>
-            <a className="underline">Back</a>
+          <Link href={`/tournament/${slug}/weeks`} className="underline">
+            Back
           </Link>
         </p>
       </main>
@@ -63,8 +63,8 @@ export default async function WeekDetail({ params }: Props) {
       <p className="text-sm text-zinc-400 mb-4">{week.title ?? ""}</p>
 
       <p className="mb-4">
-        <Link href={`/tournament/${slug}/weeks`}>
-          <a className="underline">← Back to weeks</a>
+        <Link href={`/tournament/${slug}/weeks`} className="underline">
+          ← Back to weeks
         </Link>
       </p>
 
