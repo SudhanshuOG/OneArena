@@ -67,10 +67,29 @@ export default async function TournamentWeeksPage({ params }: Props) {
                 <div className="mt-2 text-sm text-zinc-400">
                   Created: {new Date(w.created_at).toLocaleString()}
                 </div>
-                <div className="mt-3">
+
+                <div className="mt-3 flex gap-4">
                   <Link href={`/tournament/${slug}/weeks/${w.week_no}`}>
-                    View matches for this week
+                    View details
                   </Link>
+
+                  {/* Edit button */}
+                  <Link href={`/tournament/${slug}/weeks/edit/${w.id}`}>
+                    <span className="text-blue-500 hover:underline">Edit</span>
+                  </Link>
+
+                  {/* Delete button */}
+                  <form
+                    action={`/tournament/${slug}/weeks/delete/${w.id}`}
+                    method="post"
+                  >
+                    <button
+                      type="submit"
+                      className="text-red-500 hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </form>
                 </div>
               </article>
             ))}

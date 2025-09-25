@@ -1,49 +1,53 @@
-﻿"use client";
+"use client";
 import React, { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type Props = {
-  serverTournamentId: string;
+  serverWeekId: string;
   serverSlug: string;
+  serverWeekNo: number;
 };
 
-export default function CreateWeekForm({
-  serverTournamentId,
+export default function CreateDayForm({
+  serverWeekId,
   serverSlug,
+  serverWeekNo,
 }: Props) {
-  const [weekNo, setWeekNo] = useState<number | "">("");
+  const [dayNo, setDayNo] = useState<number | "">("");
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!weekNo) {
-      setMsg("Enter week number");
+    if (!dayNo) {
+      setMsg("Enter day number");
       return;
     }
     setLoading(true);
     setMsg(null);
+
     const { data, error } = await supabase
-      .from("weeks")
+      .from("days")
       .insert([
         {
-          tournament_id: serverTournamentId,
-          week_no: Number(weekNo),
+          week_id: serverWeekId,
+          day_no: Number(dayNo),
           title: title || null,
         },
       ])
       .select()
       .single();
+
     setLoading(false);
     if (error) {
       setMsg("Error: " + error.message);
       return;
     }
-    setMsg("Week created. Refreshing page...");
+    setMsg("Day created. Reloading...");
     setTimeout(() => {
-      window.location.href = /tournament/ / weeks;
-    }, 800);
+      window.location.href = `/tournament/${serverSlug}/weeks/${serverWeekNo}`;
+    }, 700);
   }
 
   return (
@@ -51,11 +55,11 @@ export default function CreateWeekForm({
       <input
         type="number"
         min={1}
-        value={weekNo}
+        value={dayNo}
         onChange={(e) =>
-          setWeekNo(e.target.value === "" ? "" : Number(e.target.value))
+          setDayNo(e.target.value === "" ? "" : Number(e.target.value))
         }
-        placeholder="Week no (1)"
+        placeholder="Day no (1)"
         className="px-2 py-1 rounded bg-zinc-900"
       />
       <input
@@ -68,9 +72,9 @@ export default function CreateWeekForm({
       <button
         type="submit"
         disabled={loading}
-        className="px-3 py-1 rounded bg-sky-600"
+        className="px-3 py-1 rounded bg-green-600"
       >
-        {loading ? "Creating..." : "Create"}
+        {loading ? "Creating..." : "Create Day"}
       </button>
       {msg && <div className="text-sm text-zinc-300 ml-3">{msg}</div>}
     </form>
