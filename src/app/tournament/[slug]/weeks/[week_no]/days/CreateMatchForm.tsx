@@ -33,13 +33,14 @@ export default function CreateMatchForm({
       setMsg("Enter both team names");
       return;
     }
+
     setLoading(true);
     setMsg(null);
 
     const payload = {
       tournament_id: serverTournamentId,
       week_id: serverWeekId,
-      day_id: serverDayId, // IMPORTANT
+      day_id: serverDayId,
       match_no: matchNo === "" ? null : Number(matchNo),
       map: mapName || null,
       datetime: datetime ? new Date(datetime).toISOString() : null,
@@ -52,7 +53,9 @@ export default function CreateMatchForm({
       setMsg("Error: " + error.message);
       return;
     }
+
     setMsg("Match created ✔");
+    // go to matches list for this day
     setTimeout(() => {
       window.location.href = `/tournament/${serverSlug}/weeks/${serverWeekNo}/days/${serverDayNo}/matches`;
     }, 600);
