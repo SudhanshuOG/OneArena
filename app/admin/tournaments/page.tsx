@@ -45,6 +45,12 @@ export default async function Page() {
               >
                 Manage Stages
               </Link>
+              <Link
+                href={`/admin/tournaments/${t.id}/matches`}
+                className="text-sm border px-2 py-1 rounded"
+              >
+                Matches
+              </Link>
               <DeleteTournamentButton id={t.id} />
             </div>
           </li>
