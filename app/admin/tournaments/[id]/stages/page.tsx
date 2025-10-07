@@ -5,8 +5,15 @@ import StageRow from "@/components/admin/StageRow";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page({ params }: { params: { id: string } }) {
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: Record<string, string | string[] | undefined>;
+}) {
   const tournamentId = params.id;
+  const showArchived = searchParams?.archived === "1";
 
   const [{ data: tRow }, { data: stages, error }] = await Promise.all([
     supabaseAdmin
@@ -14,11 +21,19 @@ export default async function Page({ params }: { params: { id: string } }) {
       .select("name")
       .eq("id", tournamentId)
       .single(),
-    supabaseAdmin
-      .from("stages")
-      .select("id,name,order_index")
-      .eq("tournament_id", tournamentId)
-      .order("order_index", { ascending: true }),
+
+    // ✅ fix applied here
+    (function () {
+      let q = supabaseAdmin
+        .from("stages")
+        .select("id,name,order_index,deleted_at")
+        .eq("tournament_id", tournamentId)
+        .order("order_index", { ascending: true });
+
+      return showArchived
+        ? q.not("deleted_at", "is", null)
+        : q.is("deleted_at", null);
+    })(),
   ]);
 
   if (error) return <pre>DB error: {error.message}</pre>;
@@ -29,33 +44,31 @@ export default async function Page({ params }: { params: { id: string } }) {
         <h1 className="text-2xl font-semibold">
           Stages — {tRow?.name ?? "Tournament"}
         </h1>
-        <Link href="/admin/tournaments" className="underline text-sm">
-          ← Back to tournaments
-        </Link>
+
+        <div className="flex items-center gap-4">
+          <Link
+            href={`?archived=${showArchived ? "0" : "1"}`}
+            className="underline text-sm"
+          >
+            {showArchived ? "← Back to active" : "View Archived"}
+          </Link>
+          <Link href="/admin/tournaments" className="underline text-sm">
+            ← Back to tournaments
+          </Link>
+        </div>
       </div>
 
-      <NewStageForm tournamentId={tournamentId} />
+      {!showArchived && <NewStageForm tournamentId={tournamentId} />}
 
-      <ul className="divide-y border rounded">
-        {stages?.map((s) => (
-          <li key={s.id} className="p-3 flex items-center justify-between">
-            <span>
-              {s.order_index}. {s.name}
-            </span>
-          </li>
-        ))}
-        {(!stages || stages.length === 0) && (
-          <li className="p-3 text-sm text-gray-500">No stages yet.</li>
-        )}
-      </ul>
-      <ul className="divide-y border rounded">
-        {stages?.map((s) => (
-          <StageRow key={s.id} stage={s as any} />
-        ))}
-        {(!stages || stages.length === 0) && (
-          <li className="p-3 text-sm text-gray-500">No stages yet.</li>
-        )}
-      </ul>
+      {stages && stages.length > 0 ? (
+        <ul className="divide-y border rounded">
+          {stages.map((s) => (
+            <StageRow key={s.id} stage={s as any} />
+          ))}
+        </ul>
+      ) : (
+        <p className="p-3 text-sm text-gray-500">No stages found.</p>
+      )}
     </div>
   );
 }

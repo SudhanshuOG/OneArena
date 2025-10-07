@@ -32,16 +32,25 @@ export default function GamesAdmin() {
   const [deletingId, setDeletingId] = useState<string | number | null>(null);
 
   useEffect(() => {
-    fetchGames();
+    const params = new URLSearchParams(window.location.search);
+    const showArchived = params.get("archived") === "1";
+    fetchGames(showArchived);
   }, []);
 
-  async function fetchGames() {
+  async function fetchGames(archived: boolean = false) {
     setLoading(true);
     setErrMsg(null);
-    const { data, error } = await supabase
+
+    let query = supabase
       .from("games")
-      .select("id, name, slug, alias")
+      .select("id, name, slug, alias, deleted_at")
       .order("name", { ascending: true });
+
+    query = archived
+      ? query.not("deleted_at", "is", null)
+      : query.is("deleted_at", null);
+
+    const { data, error } = await query;
 
     if (error) setErrMsg(error.message);
     setGames(data || []);
@@ -122,7 +131,32 @@ export default function GamesAdmin() {
     <div className="p-6 text-white">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Games</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-4">
+            Games
+            <span className="text-sm font-normal space-x-2 ml-4">
+              <a
+                href="/admin/games"
+                className={`px-2 py-0.5 rounded border ${
+                  window.location.search.includes("archived")
+                    ? "border-neutral-600"
+                    : "bg-neutral-800 border-white"
+                }`}
+              >
+                Active
+              </a>
+              <a
+                href="/admin/games?archived=1"
+                className={`px-2 py-0.5 rounded border ${
+                  window.location.search.includes("archived")
+                    ? "bg-neutral-800 border-white"
+                    : "border-neutral-600"
+                }`}
+              >
+                Archived
+              </a>
+            </span>
+          </h1>
+
           {!adding && (
             <button
               onClick={() => setAdding(true)}
@@ -202,23 +236,54 @@ export default function GamesAdmin() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => startEdit(g)}
-                  className="px-3 py-1 rounded border border-neutral-600 hover:bg-neutral-800"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(g.id, g.name)}
-                  disabled={deletingId === g.id}
-                  className={`px-3 py-1 rounded border ${
-                    deletingId === g.id
-                      ? "opacity-50"
-                      : "border-red-500 hover:bg-red-700"
-                  }`}
-                >
-                  {deletingId === g.id ? "Deleting..." : "Delete"}
-                </button>
+                {"deleted_at" in g && g.deleted_at ? (
+                  <>
+                    {/* Archived actions */}
+                    <button
+                      onClick={async () => {
+                        const { error } = await supabase
+                          .from("games")
+                          .update({ deleted_at: null })
+                          .eq("id", g.id);
+                        if (error) alert(error.message);
+                        else fetchGames(true);
+                      }}
+                      className="px-3 py-1 rounded border border-green-600 hover:bg-green-700"
+                    >
+                      Restore
+                    </button>
+                    <button
+                      onClick={() => handleDelete(g.id, g.name)}
+                      className="px-3 py-1 rounded border border-red-600 hover:bg-red-700"
+                    >
+                      Delete Forever
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* Active actions */}
+                    <button
+                      onClick={() => startEdit(g)}
+                      className="px-3 py-1 rounded border border-neutral-600 hover:bg-neutral-800"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Archive "${g.name}"?`)) return;
+                        const { error } = await supabase
+                          .from("games")
+                          .update({ deleted_at: new Date().toISOString() })
+                          .eq("id", g.id);
+                        if (error) alert(error.message);
+                        else fetchGames();
+                      }}
+                      className="px-3 py-1 rounded border border-red-500 hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
