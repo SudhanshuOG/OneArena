@@ -1,147 +1,247 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 type Stage = { id: string; name: string };
-type DayRow = {
-  id: string;
-  stage_id: string;
-  day_date: string;
-  week_name?: string;
-};
+type Week = { id: string; title: string };
+type Day = { id: string; title: string; week_id?: string; date?: string };
 
 export default function NewMatchForm({
   tournamentId,
   stages,
-  days,
 }: {
   tournamentId: string;
   stages: Stage[];
-  days: DayRow[];
 }) {
   const router = useRouter();
-
-  const [stageId, setStageId] = useState<string>("");
-  const [dayId, setDayId] = useState<string>("");
+  const [stageId, setStageId] = useState<string>(stages[0]?.id ?? "");
+  const [weeks, setWeeks] = useState<Week[]>([]);
+  const [days, setDays] = useState<Day[]>([]);
+  const [selectedWeek, setSelectedWeek] = useState<string>("");
+  const [selectedDay, setSelectedDay] = useState<string>(""); // empty = attach to stage
   const [matchNo, setMatchNo] = useState<number>(1);
-  const [scheduledAt, setScheduledAt] = useState<string>(""); // date only (YYYY-MM-DD)
+  const [scheduled, setScheduled] = useState<string>(""); // datetime-local value
   const [status, setStatus] = useState<string>("planned");
+  const [isPending, start] = useTransition();
 
-  // Days filtered by selected stage
-  const filteredDays = useMemo(
-    () => days.filter((d) => d.stage_id === stageId),
-    [days, stageId]
-  );
+  useEffect(() => {
+    if (stageId) {
+      fetchWeeks();
+      fetchDays();
+      setSelectedWeek("");
+      setSelectedDay("");
+    }
+  }, [stageId]);
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function fetchWeeks() {
+    const res = await fetch(`/api/admin/stages/${stageId}/weeks`);
+    if (!res.ok) {
+      setWeeks([]);
+      return;
+    }
+    const j = await res.json();
+    setWeeks(j || []);
+  }
 
-    const res = await fetch("/api/admin/matches", {
+  async function fetchDays(weekId?: string) {
+    const res = await fetch(`/api/admin/stages/${stageId}/days`);
+    if (!res.ok) {
+      setDays([]);
+      return;
+    }
+    let j = await res.json();
+    if (weekId) j = j.filter((d: Day) => d.week_id === weekId);
+    setDays(j || []);
+  }
+
+  async function createWeek(title: string) {
+    const res = await fetch(`/api/admin/stages/${stageId}/weeks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert("Week create failed: " + (j?.error || JSON.stringify(j)));
+      return;
+    }
+    await fetchWeeks();
+    setSelectedWeek(j.id);
+  }
+
+  async function createDay(title: string, date?: string, week_id?: string) {
+    const res = await fetch(`/api/admin/stages/${stageId}/days`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        stage_id: stageId,
-        day_id: dayId || null, // optional
-        match_no: matchNo,
-        scheduled_at: scheduledAt || null, // date only
-        status,
+        title,
+        date: date || null,
+        week_id: week_id || null,
       }),
     });
-
-    if (res.ok) {
-      router.push(`/admin/tournaments/${tournamentId}/matches`);
-    } else {
-      const j = await res.json().catch(() => ({}));
-      alert("Failed to create: " + (j?.error || res.status));
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert("Day create failed: " + (j?.error || JSON.stringify(j)));
+      return;
     }
-  };
+    await fetchDays(week_id);
+    setSelectedDay(j.id);
+  }
+
+  function promptCreateWeek() {
+    const val = prompt("Week title (e.g. Week 1)");
+    if (val && val.trim()) createWeek(val.trim());
+  }
+  function promptCreateDay() {
+    const val = prompt("Day title (e.g. Day 1)");
+    if (val && val.trim())
+      createDay(val.trim(), undefined, selectedWeek || undefined);
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    start(async () => {
+      const payload = {
+        stage_id: stageId,
+        day_id: selectedDay || null,
+        match_no: Number(matchNo),
+        scheduled_at: scheduled ? new Date(scheduled).toISOString() : null,
+        status,
+      };
+      const res = await fetch(
+        `/api/admin/tournaments/${tournamentId}/matches/new`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert(j?.error || `Create failed (${res.status})`);
+        return;
+      }
+      router.push(`/admin/tournaments/${tournamentId}/matches`);
+    });
+  }
 
   return (
-    <form className="space-y-4 max-w-md" onSubmit={onSubmit}>
-      <h1 className="text-2xl font-semibold">New Match</h1>
-
-      {/* Stage */}
-      <div>
-        <label className="block text-sm mb-1">Stage</label>
+    <form className="max-w-lg" onSubmit={submit}>
+      <label className="block mb-2">
+        Stage
         <select
-          className="border px-3 py-2 rounded w-full"
           value={stageId}
-          onChange={(e) => {
-            setStageId(e.target.value);
-            setDayId(""); // reset day when stage changes
-          }}
-          required
+          onChange={(e) => setStageId(e.target.value)}
+          className="w-full mt-1 p-2 rounded border bg-transparent"
         >
-          <option value="" disabled>
-            Select stage
-          </option>
           {stages.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
             </option>
           ))}
         </select>
-      </div>
+      </label>
 
-      {/* Day (optional) */}
-      <div>
-        <label className="block text-sm mb-1">Day (optional)</label>
-        <select
-          className="border px-3 py-2 rounded w-full"
-          value={dayId}
-          onChange={(e) => setDayId(e.target.value)}
-          disabled={!stageId}
+      <div className="flex gap-2 items-end mb-3">
+        <div className="flex-1">
+          <label className="block text-sm">Week (optional)</label>
+          <select
+            value={selectedWeek}
+            onChange={(e) => {
+              setSelectedWeek(e.target.value);
+              fetchDays(e.target.value);
+            }}
+            className="w-full mt-1 p-2 rounded border bg-transparent"
+          >
+            <option value="">(No week — use stage/days)</option>
+            {weeks.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={promptCreateWeek}
+          className="px-3 py-1 border rounded"
         >
-          <option value="">(No day — attach to stage)</option>
-          {filteredDays.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.day_date}
-              {d.week_name ? ` — ${d.week_name}` : ""}
-            </option>
-          ))}
-        </select>
+          + Week
+        </button>
       </div>
 
-      {/* Match number */}
-      <div>
-        <label className="block text-sm mb-1">Match #</label>
+      <div className="flex gap-2 items-end mb-3">
+        <div className="flex-1">
+          <label className="block text-sm">Day (optional)</label>
+          <select
+            value={selectedDay}
+            onChange={(e) => setSelectedDay(e.target.value)}
+            className="w-full mt-1 p-2 rounded border bg-transparent"
+          >
+            <option value="">(No day — attach to stage)</option>
+            {days.map((d: any) => (
+              <option key={d.id} value={d.id}>
+                {d.title}
+                {d.date ? ` — ${d.date}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={promptCreateDay}
+          className="px-3 py-1 border rounded"
+        >
+          + Day
+        </button>
+      </div>
+
+      <label className="block mb-2">
+        Match #
         <input
           type="number"
-          min={1}
-          className="border px-3 py-2 rounded w-full"
           value={matchNo}
-          onChange={(e) => setMatchNo(parseInt(e.target.value || "1", 10))}
-          required
+          onChange={(e) => setMatchNo(Number(e.target.value))}
+          className="w-full mt-1 p-2 rounded border bg-transparent"
         />
-      </div>
+      </label>
 
-      {/* Scheduled (date only) */}
-      <div>
-        <label className="block text-sm mb-1">Scheduled (optional)</label>
+      <label className="block mb-2">
+        Scheduled (optional)
         <input
-          type="date" // only date
-          className="border px-3 py-2 rounded w-full"
-          value={scheduledAt}
-          onChange={(e) => setScheduledAt(e.target.value)}
+          type="datetime-local"
+          value={scheduled}
+          onChange={(e) => setScheduled(e.target.value)}
+          className="w-full mt-1 p-2 rounded border bg-transparent"
         />
-      </div>
+      </label>
 
-      {/* Status */}
-      <div>
-        <label className="block text-sm mb-1">Status</label>
+      <label className="block mb-4">
+        Status
         <select
-          className="border px-3 py-2 rounded w-full"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
+          className="w-full mt-1 p-2 rounded border bg-transparent"
         >
           <option value="planned">planned</option>
-          <option value="live">live</option>
+          <option value="ongoing">ongoing</option>
           <option value="completed">completed</option>
         </select>
-      </div>
+      </label>
 
-      <button className="px-3 py-2 border rounded">Save</button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => history.back()}
+          className="px-4 py-2 border rounded"
+        >
+          Cancel
+        </button>
+        <button type="submit" className="px-4 py-2 border rounded bg-green-600">
+          Save
+        </button>
+      </div>
     </form>
   );
 }
